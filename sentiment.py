@@ -168,7 +168,7 @@ def app():
         st.plotly_chart(fig_stats, use_container_width=True)
 
     elif choice == "Sentiment Analysis":
-        word_query = st.text_input("🔍 Enter a hashtag or keyword:", placeholder="#example")
+        word_query = st.text_input("🔍 Enter a hashtag or keyword:", placeholder="e.g., AI, OpenAI, Python, Tesla")
         number_of_tweets = st.slider("Number of Tweets to Analyze:", min_value=10, max_value=100, step=10)
 
         if st.button("Analyze Sentiment", key="analyze"):

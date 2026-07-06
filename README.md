@@ -4,6 +4,12 @@ A real-time sentiment analysis web application built with **Python**, **Streamli
 
 ---
 
+## 🌐 Live Demo
+
+https://social-media-twitter-sentiment-analyzer.streamlit.app
+
+---
+
 ## 🚀 Features
 
 - 🔍 Search tweets using any keyword or hashtag
