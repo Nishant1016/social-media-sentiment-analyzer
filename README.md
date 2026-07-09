@@ -55,7 +55,7 @@ https://social-media-twitter-sentiment-analyzer.streamlit.app
 
 ```bash
 git clone https://github.com/Nishant1016/social-media-sentiment-analyzer.git
-cd "Sentiment Analysis"
+cd social-media-sentiment-analyzer
 ```
 
 ### Create and activate a virtual environment
@@ -123,6 +123,13 @@ Sentiment Analysis/
 4. Analyze each tweet using the BERTweet sentiment model.
 5. Display sentiment insights with interactive charts and statistics.
 
+## 📄 Xquik CSV Workflow
+
+You can also export X post search or monitor results from Xquik as CSV and
+upload them in the Sentiment Analysis view. The importer accepts `text`,
+`Tweet`, `content`, or `body` columns, then uses the same BERTweet model and
+dashboard views without requiring a Twitter/X API bearer token.
+
 ---
 
 ## 📌 Notes
@@ -132,6 +139,5 @@ Sentiment Analysis/
 - Keep your `.env` file private and never commit API keys to GitHub.
 
 ---
-
 
 
