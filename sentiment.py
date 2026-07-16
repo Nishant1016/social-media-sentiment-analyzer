@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 BEARER_TOKEN = os.getenv("BEARER_TOKEN")
+TEXT_COLUMN_CANDIDATES = ("text", "Text", "tweet", "Tweet", "content", "body")
 
 # Initialize BERTweet-based sentiment model from finiteautomata
 @st.cache_resource
@@ -32,6 +33,38 @@ def analyze_sentiment(text, tokenizer, model):
         # Convert to compound score (-1 to 1 scale)
         compound = (positive - negative)
         return compound
+
+
+def find_text_column(dataframe):
+    for column in TEXT_COLUMN_CANDIDATES:
+        if column in dataframe.columns:
+            return column
+
+    return None
+
+
+def analyze_exported_tweets(uploaded_df, tokenizer, model):
+    text_column = find_text_column(uploaded_df)
+
+    if text_column is None:
+        return pd.DataFrame()
+
+    tweets_df = pd.DataFrame(
+        {
+            "id": uploaded_df.get("id", uploaded_df.index + 1),
+            "text": uploaded_df[text_column].astype(str),
+        }
+    )
+
+    if "created_at" in uploaded_df.columns:
+        tweets_df["created_at"] = pd.to_datetime(uploaded_df["created_at"], errors="coerce")
+
+    tweets_df["sentiment_score"] = tweets_df["text"].apply(
+        lambda text: analyze_sentiment(text, tokenizer, model)
+    )
+
+    return tweets_df
+
 
 # Set page configuration
 st.set_page_config(
@@ -73,7 +106,7 @@ def fetch_tweets(word_query, number_of_tweets=10):
     while attempt < max_retries:
         time.sleep(3)  # Prevent rate limiting
         
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=20)
 
         if response.status_code == 200:
             data = response.json()
@@ -90,13 +123,18 @@ def fetch_tweets(word_query, number_of_tweets=10):
 
         elif response.status_code == 429:
             reset_time = int(response.headers.get("x-rate-limit-reset", time.time() + 60))
-            wait_time = reset_time - int(time.time())
+            wait_time = max(reset_time - int(time.time()), 0)
             st.warning(f"Rate limit exceeded. Waiting {wait_time} seconds...")
             time.sleep(wait_time + 1)
             attempt += 1
 
         else:
-            st.error(f"Error fetching tweets: {response.status_code}, {response.json()}")
+            try:
+                error_detail = response.json()
+            except ValueError:
+                error_detail = response.text
+
+            st.error(f"Error fetching tweets: {response.status_code}, {error_detail}")
             return pd.DataFrame()
 
     st.error("Max retries reached. Please try again later.")
@@ -170,9 +208,45 @@ def app():
     elif choice == "Sentiment Analysis":
         word_query = st.text_input("🔍 Enter a hashtag or keyword:", placeholder="e.g., AI, OpenAI, Python, Tesla")
         number_of_tweets = st.slider("Number of Tweets to Analyze:", min_value=10, max_value=100, step=10)
+        xquik_file = st.file_uploader(
+            "Upload Xquik CSV export",
+            type=["csv"],
+            help="Use CSV files with text, Tweet, content, or body columns.",
+        )
 
         if st.button("Analyze Sentiment", key="analyze"):
-            if word_query:
+            if xquik_file is not None:
+                with st.spinner("Analyzing uploaded Xquik export..."):
+                    tokenizer, model = load_sentiment_model()
+                    uploaded_df = pd.read_csv(xquik_file)
+                    data = analyze_exported_tweets(uploaded_df, tokenizer, model)
+
+                if data.empty:
+                    st.warning("CSV needs a text, Tweet, content, or body column.")
+                else:
+                    st.session_state["tweets_data"] = data
+                    st.subheader("📄 Xquik Export Dataset")
+                    st.dataframe(data)
+
+                    positive = len(data[data["sentiment_score"] > 0.3])
+                    neutral = len(data[(data["sentiment_score"] >= -0.3) & (data["sentiment_score"] <= 0.3)])
+                    negative = len(data[data["sentiment_score"] < -0.3])
+
+                    sentiment_df = pd.DataFrame({
+                        "Sentiment": ["Positive", "Neutral", "Negative"],
+                        "Count": [positive, neutral, negative]
+                    })
+
+                    fig_sentiment = px.bar(
+                        sentiment_df,
+                        x="Sentiment",
+                        y="Count",
+                        color="Sentiment",
+                        title="Sentiment Summary"
+                    )
+                    st.plotly_chart(fig_sentiment, use_container_width=True)
+
+            elif word_query:
                 with st.spinner("Fetching tweets and analyzing sentiment..."):
                     try:
                         data = fetch_tweets(word_query, number_of_tweets)
